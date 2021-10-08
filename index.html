@@ -3,16 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <title>Title</title>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"
+            crossorigin="anonymous"></script>
+    <style>
+        body {
+            background-color: cyan;
+        }
+    </style>
 </head>
 <body>
 <div class="container">
-    <video id="gum_video" autoplay playsinline muted></video>
-    <canvas id="output_canvas" width="1280px" height="720px"></canvas>
-    <video id="segment_video"  autoplay playsinline muted></video>
+    <div>
+        <h2>Sender</h2>
+    <table>
+        <tr>
+            <td><h3>Source video</h3></td>
+            <td><h3>Segmented and background replacement</h3></td>
+            <td><h3>Alpha channel added for transparency</h3></td>
+        </tr>
+        <tr>
+            <td>
+                <video id="gum_video" autoplay playsinline muted></video>
+            </td>
+            <td>
+                <canvas id="green_screen_canvas"></canvas>
+            </td>
+            <td>
+                <canvas id="transparent_canvas"></canvas>
+            </td>
+        </tr>
+    </table>
+    </div>
 
 </div>
 <script type="module" src="main.js"></script>

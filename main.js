@@ -1,28 +1,24 @@
-import {segment} from "./segemt.mjs";
-
-/*
-const camera = new Camera(videoElement, {
-    onFrame: async () => {
-        await selfieSegmentation.send({image: videoElement});
-    },
-    width: 1280,
-    height: 720
-});
-camera.start();
-
-*/
+import {segment} from "./segment.mjs";
+import {addTransparency} from "./transparency.mjs";
 
 
 async function main(){
-    let inputStream = await navigator.mediaDevices.getUserMedia({video: {height: 720, width: 1280}});
-    const videoElement = document.querySelector('video#gum_video');
-    videoElement.srcObject = inputStream;
 
-    await segment(videoElement);
-    //const [inputTrack] = inputStream.getVideoTracks();
+    const videoElement = document.querySelector('video#gum_video');
+    const greenScreenCanvas = document.querySelector('canvas#green_screen_canvas');
+    const transparentCanvas = document.querySelector('canvas#transparent_canvas');
+
+    // create a stream and send it to replace when its starts playing
+    videoElement.onplaying = async ()=> {
+        await segment(videoElement, greenScreenCanvas);
+        addTransparency(greenScreenCanvas, transparentCanvas);
+    };
+
+
+    let inputStream = await navigator.mediaDevices.getUserMedia( {video: true});
+    videoElement.srcObject = inputStream;
 
 }
 
 main().catch(err=>console.error(err));
 
-//document.getElementById('video#segment_video').srcObject = segmentStream;
