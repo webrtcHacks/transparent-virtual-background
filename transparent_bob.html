@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simplified Example</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"
+            crossorigin="anonymous"></script>
+    <style>
+        body {
+            background-color: cyan;
+        }
+        .mirror {
+            transform: scaleX(-1);
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div>
+        <h2>Sender</h2>
+        <div>
+            <label for="devices">Choose your camera</label>
+            <select name="devices" id="devices"></select>
+            <br>
+            <button id="qvga">QVGA</button>
+            <button id="vga">VGA</button>
+            <button id="hd">HD</button>
+        </div>
+    </div>
+
+    <br>
+
+    <div>
+        <h3>Source</h3>
+        <canvas id="transparent_self" class="mirror"></canvas>
+    </div>
+    <br>
+    <button id="call" disabled>Send through peerConnection</button>
+    <br>
+    <div>
+        <h2>Receiver</h2>
+        <video autoplay muted playsinline></video>
+        <canvas id="transparent_receiver"></canvas>
+    </div>
+    <script type="module">
+
+
+        const selfieCanvas = document.querySelector('canvas#transparent_self');
+        // const receiverCanvas = document.querySelector('canvas#transparent_receiver');
+
+
+        const deviceSelect = document.querySelector('select#devices');
+
+        const qvgaBtn = document.querySelector('button#qvga');
+        const vgaBtn = document.querySelector('button#vga');
+        const hdBtn = document.querySelector('button#hd');
+        const callBtn = document.querySelector('button#call');
+
+        const FRAME_RATE = 30;
+
+        let videoDevices = [];
+
+        // Transparency
+        function addAplha(imageData) {
+
+            let data = imageData.data;
+            const gFloor = 105;         // consider any green above this value to be transparent
+            const rbCeiling = 80;       // highest value for red and blue to be considered transparent
+
+            for (let r = 0, g = 1, b = 2, a = 3; a < data.length; r += 4, g += 4, b += 4, a += 4) {
+                if (data[r] <= rbCeiling && data[b] <= rbCeiling && data[g] >= gFloor)
+                    data[a] = 0;
+            }
+
+            return imageData
+
+        }
+
+
+        // Receiver
+        let receiverOffScreen = new OffscreenCanvas(1,1);
+        let receiverCtx = receiverOffScreen.getContext("2d");
+        function addTransparency(frame, controller){
+            let height = frame.codedHeight;
+            let width = frame.codedWidth;
+
+            receiverOffScreen.height = height;
+            receiverOffScreen.width = width;
+
+            receiverCtx.drawImage(frame, 0, 0, width, height);
+            let imageData = receiverCtx.getImageData(0, 0, width, height);
+            let transparentImageData = addAplha(imageData);
+            receiverCtx.putImageData(transparentImageData, 0, 0);
+
+            const newFrame = new VideoFrame(receiverOffScreen);
+            controller.enqueue(newFrame);
+            frame.close();
+
+        }
+
+        document.addEventListener('offer', async e => {
+            console.debug(e.detail);
+
+            let pc = new RTCPeerConnection();
+
+            pc.ontrack = async e => {
+                console.debug(e);
+                let track = e.track;
+
+                const processor = new MediaStreamTrackProcessor({track});
+
+                const generator = new MediaStreamTrackGenerator({kind: 'video'});
+                let transparentStream = new MediaStream([generator]);
+                document.querySelector('video').srcObject = transparentStream;
+
+                await processor.readable.pipeThrough(new TransformStream({
+                    transform: (frame, controller) => addTransparency(frame, controller)
+                })).pipeTo(generator.writable);
+
+            };
+
+
+            document.addEventListener('candidate', async e => {
+                console.debug(e.detail);
+                await pc.addIceCandidate(e.detail.candidate);
+            });
+
+
+            await pc.setRemoteDescription(e.detail);
+
+            window.receiverPc = pc;
+
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            let message = pc.localDescription;
+            const toSenderEvent = new CustomEvent('answer', {detail: message});
+            document.dispatchEvent(toSenderEvent);
+
+        });
+
+
+        // Sender
+        async function sendVideo(stream) {
+
+            console.log("peerConnection starting");
+
+            let track = stream.getVideoTracks()[0];
+
+            let pc = new RTCPeerConnection();
+            pc.addTrack(track, stream);
+            window.sendStream = stream;         // for debugging
+
+
+            pc.onicecandidate = candidate => {
+                const toReceiverEvent = new CustomEvent('candidate', {detail: candidate});
+                document.dispatchEvent(toReceiverEvent);
+            };
+
+
+            let offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            let message = pc.localDescription;
+            const toReceiverEvent = new CustomEvent('offer', {detail: message});
+            document.dispatchEvent(toReceiverEvent);
+
+
+            document.addEventListener('answer', async e => {
+                console.debug(e.detail);
+                await pc.setRemoteDescription(e.detail);
+            });
+        }
+
+
+        // Segment
+
+        let ctx = selfieCanvas.getContext('2d');
+
+        let offscreen = new OffscreenCanvas(1, 1);
+        let offscreenCtx = offscreen.getContext("2d");
+
+        const selfieSegmentation = new SelfieSegmentation({
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
+            }
+        });
+        selfieSegmentation.setOptions({
+            modelSelection: 1,
+        });
+
+        async function segment(frame, controller) {
+
+            let height = frame.codedHeight;
+            let width = frame.codedWidth;
+
+            offscreen.height = height;
+            offscreen.width = width;
+
+            offscreenCtx.drawImage(frame, 0, 0, width, height);
+
+
+            await selfieSegmentation.onResults(results => {
+
+                ctx.save();
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(results.segmentationMask, 0, 0,
+                    width, height);
+
+                // Only overwrite existing pixels with green.
+                ctx.globalCompositeOperation = 'source-out'; // 'source-in';
+                ctx.fillStyle = '#00FF00';
+                ctx.fillRect(0, 0, width, height);
+
+                // Only overwrite missing pixels.
+                ctx.globalCompositeOperation = 'destination-atop';
+                ctx.drawImage(
+                    results.image, 0, 0, width, height);
+                ctx.restore();
+
+                const newFrame = new VideoFrame(selfieCanvas);
+                controller.enqueue(newFrame);
+                frame.close();
+
+                ctx.save();
+                // Add the transparency for selfie display
+                let imageData = ctx.getImageData(0, 0, width, height);
+                let transparentImageData = addAplha(imageData);
+                ctx.putImageData(transparentImageData, 0, 0);
+
+                ctx.restore();
+
+
+            });
+
+
+            await selfieSegmentation.send({image: offscreen});
+
+        }
+
+
+        // Get Video
+        async function getVideo(height = 480, width = 640) {
+
+            console.log(`Getting ${width}x${height} video`);
+
+            selfieCanvas.height = height;
+            selfieCanvas.width = width;
+
+
+            let videoSource = videoDevices[deviceSelect.selectedIndex || 0]?.deviceId;
+
+            let stream = await navigator.mediaDevices.getUserMedia(
+                {
+                    video:
+                        {
+                            height: height, width: width, frameRate: FRAME_RATE,
+                            deviceId: videoSource ? {exact: videoSource} : undefined
+                        }
+                });
+
+            console.log(`Capture camera with device ${videoDevices[deviceSelect.selectedIndex || 0]?.label}`);
+            callBtn.disabled = false;
+
+            const generator = new MediaStreamTrackGenerator({kind: 'video'});
+
+            let [track] = stream.getVideoTracks();
+
+            const processor = new MediaStreamTrackProcessor({track});
+            let sendStream = new MediaStream([generator]);
+
+            callBtn.onclick = async ()=> {
+                callBtn.disabled = true;
+                await sendVideo(sendStream);
+            };
+
+
+            await processor.readable.pipeThrough(new TransformStream({
+                transform: (frame, controller) => segment(frame, controller)
+            })).pipeTo(generator.writable);
+
+        }
+
+
+        async function start() {
+
+
+            // allow camera selection
+            let devices = await navigator.mediaDevices.enumerateDevices();
+            videoDevices = devices.filter(device => device.kind === 'videoinput');
+            videoDevices.forEach(device => {
+                const option = document.createElement('option');
+                option.text = device.label;
+                deviceSelect.appendChild(option);
+            });
+
+
+            await getVideo();
+
+            deviceSelect.onchange = getVideo;
+
+            qvgaBtn.onclick = () => getVideo(240, 320);
+            vgaBtn.onclick = () => getVideo(480, 640);
+            hdBtn.onclick = () => getVideo(720, 1280);
+
+        }
+
+        start().catch(err => console.error(err));
+
+
+    </script>
+</div>
+</body>
+</html>
