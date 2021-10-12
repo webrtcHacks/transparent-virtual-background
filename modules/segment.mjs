@@ -21,6 +21,8 @@ function greenScreen(results) {
 
 export async function segment(inputVideo, outputCanvas){
 
+
+
     height = inputVideo.videoHeight;
     width = inputVideo.videoWidth;
 
@@ -49,8 +51,6 @@ export async function segment(inputVideo, outputCanvas){
     // ToDo: this method doesn't work in FF or Safari
     inputVideo.requestVideoFrameCallback(draw);
 
-    //const generator = new MediaStreamTrackGenerator({kind: video});
-    //const processor = new MediaStreamTrackProcessor({input})
 
 }
 

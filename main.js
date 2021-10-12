@@ -10,6 +10,11 @@ const deviceSelect = document.querySelector('select#devices');
 const callBtnGreen = document.querySelector('button#call_green');
 const callBtnTransparent = document.querySelector('button#call_transparent');
 
+const qvgaBtn =  document.querySelector('button#qvga');
+const vgaBtn =  document.querySelector('button#vga');
+const hdBtn =  document.querySelector('button#hd');
+
+
 const FRAME_RATE = 30;
 
 async function sendVideo(stream){
@@ -18,12 +23,10 @@ async function sendVideo(stream){
     callBtnTransparent.disabled = true;
 
     let track = stream.getVideoTracks()[0];
-    let settings = track.getSettings();
-    console.log(settings);
 
     let pc = new RTCPeerConnection();
     pc.addTrack(track, stream);
-    window.sendStream = stream;
+    window.sendStream = stream;         // for debugging
 
 
     // pc.onicecandidateerror = err => console.error(err);
@@ -58,9 +61,39 @@ async function sendVideo(stream){
     });
 
 
+}
+
+
+async function getVideo(height=480, width=640){
+
+    console.log(`Getting ${width}x${height} video`);
+
+    document.querySelectorAll('video').forEach(element=>{
+        element.height = height;
+        element.width = width;
+    });
+
+    let stream = videoElement.srcObject;
+
+    // kill any running streams to free resources
+    if(stream !== null) {
+        stream.getTracks().forEach(track => track.stop());
     }
 
-async function main(){
+    let videoSource = videoDevices[deviceSelect.selectedIndex || 0]?.deviceId;
+
+    stream = await navigator.mediaDevices.getUserMedia(
+        {video:
+                { height: height, width: width, frameRate: FRAME_RATE,
+                    deviceId: videoSource ? {exact: videoSource} : undefined}});
+    videoElement.srcObject = stream;
+
+    console.log(`Capture camera with device ${videoDevices[deviceSelect.selectedIndex || 0]?.label}`);
+}
+
+
+
+async function start(){
 
 
     // create a stream and send it to replace when its starts playing
@@ -70,49 +103,33 @@ async function main(){
     };
 
 
-    async function getVideo(){
-        let stream = videoElement.srcObject;
-
-        // kill any running streams to free resources
-        if(stream !== null) {
-            stream.getTracks().forEach(track => track.stop());
-        }
-
-        let videoSource = videoDevices[deviceSelect.selectedIndex || 0]?.deviceId;
-
-        stream = await navigator.mediaDevices.getUserMedia(
-            {video:
-                        { height: 240, frameRate: FRAME_RATE,
-                            deviceId: videoSource ? {exact: videoSource} : undefined}});
-        videoElement.srcObject = stream;
-
-        console.log(`Capture camera with device ${videoDevices[deviceSelect.selectedIndex || 0]?.label}`);
-    }
-
-    let videoDevices = [];
-    async function getDevices(){
-        let devices = await navigator.mediaDevices.enumerateDevices();
-        videoDevices = devices.filter(device=>device.kind==='videoinput');
-        console.log("video devices:", videoDevices);
-        videoDevices.forEach(device=>{
-            const option = document.createElement('option');
-            option.text = device.label;
-            deviceSelect.appendChild(option);
-        });
-    }
-
-
-    deviceSelect.onchange = getVideo;
-
-    await getVideo();
     await getDevices();
+    await getVideo();
 
     callBtnGreen.onclick = ()=> sendVideo(greenScreenCanvas.captureStream(FRAME_RATE));
-
-    // Show this doesn't work
     callBtnTransparent.onclick = ()=> sendVideo(transparentCanvas.captureStream(FRAME_RATE));
 
 
 }
 
-main().catch(err=>console.error(err));
+let videoDevices = [];
+async function getDevices(){
+    let devices = await navigator.mediaDevices.enumerateDevices();
+    videoDevices = devices.filter(device=>device.kind==='videoinput');
+    console.log("video devices:", videoDevices);
+    videoDevices.forEach(device=>{
+        const option = document.createElement('option');
+        option.text = device.label;
+        deviceSelect.appendChild(option);
+    });
+}
+
+
+deviceSelect.onchange = getVideo;
+
+qvgaBtn.onclick = ()=>getVideo(240,320);
+vgaBtn.onclick = ()=>getVideo(480,640);
+hdBtn.onclick = ()=>getVideo(720,1280);
+
+
+start().catch(err=>console.error(err));

@@ -9,6 +9,12 @@
         body {
             background-color: cyan;
         }
+        .row {
+            display: flex;
+        }
+        .mirror {
+            transform: scaleX(-1);
+        }
     </style>
 </head>
 <body>
@@ -18,46 +24,45 @@
         <div>
             <label for="devices">Choose your camera</label>
             <select name="devices" id="devices"></select>
+            <br>
+            <button id="qvga">QVGA</button>
+            <button id="vga">VGA</button>
+            <button id="hd">HD</button>
         </div>
-        <table>
-            <tr>
-                <td><h3>Source video</h3></td>
-                <td><h3>Segmented with green background</h3></td>
-                <td><h3>Transparency added</h3></td>
-            </tr>
-            <tr>
-                <td>
-                    <video id="gum_video" autoplay muted playsinline></video>
-                </td>
-                <td>
-                    <canvas id="green_screen_canvas"></canvas>
-                </td>
-                <td>
-                    <canvas id="transparent_canvas"></canvas>
-                </td>
-            </tr>
-        </table>
+
+        <div class="row">
+            <div>
+                <h3>Source video</h3>
+                <video id="gum_video" autoplay muted playsinline class="mirror"></video>
+            </div>
+            <div>
+                <h3>Segmented with green background</h3>
+                <canvas id="green_screen_canvas" class="mirror"></canvas>
+            </div>
+            <div>
+                <h3>Transparency added</h3>
+                <canvas id="transparent_canvas" class="mirror"></canvas>
+            </div>
+        </div>
+
+
     </div>
+
 
     <div>
         <h2>Receiver</h2>
         <button id="call_green" class="callBtn">call using green screen</button>
         <button id="call_transparent" class="callBtn">call using transparent background</button>
-        <div>
-            <table>
-                <tr>
-                    <td><h3>Received video</h3></td>
-                    <td><h3>Transparency added</h3></td>
-                </tr>
-                <tr>
-                    <td>
-                        <video id="receiver" autoplay muted playsinline></video>
-                    </td>
-                    <td>
-                        <canvas id="transparent_receiver"></canvas>
-                    </td>
-                </tr>
-            </table>
+        <div class="row">
+            <div>
+                <h3>Received video</h3>
+                <video id="receiver" autoplay muted playsinline></video>
+            </div>
+
+            <div>
+                <h3>Transparency added</h3>
+                <canvas id="transparent_receiver"></canvas>
+            </div>
         </div>
     </div>
 
