@@ -11,11 +11,11 @@ videoElement.onplaying = async ()=> {
 document.addEventListener('offer', async e => {
     console.debug(e.detail);
 
-    let pc = new RTCPeerConnection();
+    const pc = new RTCPeerConnection();
 
     pc.ontrack = e => {
         console.debug(e);
-        let stream = e.streams[0]; // || null;
+        const stream = e.streams[0]; // || null;
         videoElement.srcObject = stream;
         window.receiveStream = stream;
     };
@@ -24,13 +24,10 @@ document.addEventListener('offer', async e => {
     // pc.onconnectionstatechange = e => console.debug(e);
     // pc.oniceconnectionstatechange = e => console.debug(e);
 
-    /*
     pc.onicecandidate = candidate => {
         const toReceiverEvent = new CustomEvent('candidate', {detail: candidate});
         document.dispatchEvent(toReceiverEvent);
     };
-     */
-
 
     document.addEventListener('candidate', async e => {
         console.debug(e.detail);
@@ -45,9 +42,6 @@ document.addEventListener('offer', async e => {
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
-    let message = pc.localDescription;
-    const toSenderEvent = new CustomEvent('answer', {detail: message});
+    const toSenderEvent = new CustomEvent('answer', {detail: answer});
     document.dispatchEvent(toSenderEvent);
-
-
 });
