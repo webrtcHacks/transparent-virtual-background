@@ -14,17 +14,14 @@ const qvgaBtn =  document.querySelector('button#qvga');
 const vgaBtn =  document.querySelector('button#vga');
 const hdBtn =  document.querySelector('button#hd');
 
-
 const FRAME_RATE = 30;
 
 async function sendVideo(stream){
-
     callBtnGreen.disabled = true;
     callBtnTransparent.disabled = true;
 
-    let track = stream.getVideoTracks()[0];
-
-    let pc = new RTCPeerConnection();
+    const track = stream.getVideoTracks()[0];
+    const pc = new RTCPeerConnection();
     pc.addTrack(track, stream);
     window.sendStream = stream;         // for debugging
 
@@ -39,33 +36,24 @@ async function sendVideo(stream){
         document.dispatchEvent(toReceiverEvent);
     };
 
-    /*
     document.addEventListener('candidate', async e => {
         console.debug(e.detail);
         await pc.addIceCandidate(e.detail.candidate);
     })
-     */
 
-
-    let offer = await pc.createOffer();
+    const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    let message = pc.localDescription;
-    const toReceiverEvent = new CustomEvent('offer', {detail: message});
+    const toReceiverEvent = new CustomEvent('offer', {detail: offer});
     document.dispatchEvent(toReceiverEvent);
-
 
     document.addEventListener('answer', async e => {
         console.debug(e.detail);
         await pc.setRemoteDescription(e.detail);
     });
-
-
 }
 
-
 async function getVideo(height=480, width=640){
-
     console.log(`Getting ${width}x${height} video`);
 
     document.querySelectorAll('video').forEach(element=>{
@@ -88,28 +76,22 @@ async function getVideo(height=480, width=640){
                     deviceId: videoSource ? {exact: videoSource} : undefined}});
     videoElement.srcObject = stream;
 
-    console.log(`Capture camera with device ${videoDevices[deviceSelect.selectedIndex || 0]?.label}`);
+    console.log(`Capture camera with device ${stream.getTracks()[0].label}`);
 }
 
-
-
 async function start(){
-
-
     // create a stream and send it to replace when its starts playing
     videoElement.onplaying = async ()=> {
         await segment(videoElement, greenScreenCanvas);
         addTransparency(greenScreenCanvas, transparentCanvas);
     };
 
-
     await getDevices();
     await getVideo();
+    // Note: list of devices may change after first approval.
 
     callBtnGreen.onclick = ()=> sendVideo(greenScreenCanvas.captureStream(FRAME_RATE));
     callBtnTransparent.onclick = ()=> sendVideo(transparentCanvas.captureStream(FRAME_RATE));
-
-
 }
 
 let videoDevices = [];

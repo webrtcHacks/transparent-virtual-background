@@ -20,9 +20,6 @@ function greenScreen(results) {
 }
 
 export async function segment(inputVideo, outputCanvas){
-
-
-
     height = inputVideo.videoHeight;
     width = inputVideo.videoWidth;
 
@@ -31,7 +28,6 @@ export async function segment(inputVideo, outputCanvas){
 
     ctx = outputCanvas.getContext('2d');
 
-
     const selfieSegmentation = new SelfieSegmentation({locateFile: (file) => {
             return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
         }});
@@ -39,9 +35,7 @@ export async function segment(inputVideo, outputCanvas){
         modelSelection: 1,
     });
 
-
     await selfieSegmentation.onResults(greenScreen);
-
 
     async function draw(){
         await selfieSegmentation.send({image: inputVideo});
@@ -50,7 +44,5 @@ export async function segment(inputVideo, outputCanvas){
 
     // ToDo: this method doesn't work in FF or Safari
     inputVideo.requestVideoFrameCallback(draw);
-
-
 }
 

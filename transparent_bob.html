@@ -27,9 +27,7 @@
             <button id="hd">HD</button>
         </div>
     </div>
-
     <br>
-
     <div>
         <h3>Source</h3>
         <canvas id="transparent_self" class="mirror"></canvas>
@@ -43,8 +41,6 @@
         <canvas id="transparent_receiver"></canvas>
     </div>
     <script type="module">
-
-
         const selfieCanvas = document.querySelector('canvas#transparent_self');
         // const receiverCanvas = document.querySelector('canvas#transparent_receiver');
 
@@ -71,18 +67,16 @@
                 if (data[r] <= rbCeiling && data[b] <= rbCeiling && data[g] >= gFloor)
                     data[a] = 0;
             }
-
-            return imageData
-
+            return imageData;
         }
 
 
         // Receiver
-        let receiverOffScreen = new OffscreenCanvas(1,1);
-        let receiverCtx = receiverOffScreen.getContext("2d");
+        const receiverOffScreen = new OffscreenCanvas(1,1);
+        const receiverCtx = receiverOffScreen.getContext("2d");
         function addTransparency(frame, controller){
-            let height = frame.codedHeight;
-            let width = frame.codedWidth;
+            const height = frame.codedHeight;
+            const width = frame.codedWidth;
 
             receiverOffScreen.height = height;
             receiverOffScreen.width = width;
@@ -95,22 +89,21 @@
             const newFrame = new VideoFrame(receiverOffScreen);
             controller.enqueue(newFrame);
             frame.close();
-
         }
 
         document.addEventListener('offer', async e => {
             console.debug(e.detail);
 
-            let pc = new RTCPeerConnection();
+            const pc = new RTCPeerConnection();
 
             pc.ontrack = async e => {
                 console.debug(e);
-                let track = e.track;
+                const {track} = e;
 
                 const processor = new MediaStreamTrackProcessor({track});
 
                 const generator = new MediaStreamTrackGenerator({kind: 'video'});
-                let transparentStream = new MediaStream([generator]);
+                const transparentStream = new MediaStream([generator]);
                 document.querySelector('video').srcObject = transparentStream;
 
                 await processor.readable.pipeThrough(new TransformStream({
@@ -119,12 +112,10 @@
 
             };
 
-
             document.addEventListener('candidate', async e => {
                 console.debug(e.detail);
                 await pc.addIceCandidate(e.detail.candidate);
             });
-
 
             await pc.setRemoteDescription(e.detail);
 
@@ -133,36 +124,29 @@
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
 
-            let message = pc.localDescription;
-            const toSenderEvent = new CustomEvent('answer', {detail: message});
+            const toSenderEvent = new CustomEvent('answer', {detail: answer});
             document.dispatchEvent(toSenderEvent);
-
         });
-
 
         // Sender
         async function sendVideo(stream) {
-
             console.log("peerConnection starting");
 
-            let track = stream.getVideoTracks()[0];
+            const track = stream.getVideoTracks()[0];
 
-            let pc = new RTCPeerConnection();
+            const pc = new RTCPeerConnection();
             pc.addTrack(track, stream);
             window.sendStream = stream;         // for debugging
-
 
             pc.onicecandidate = candidate => {
                 const toReceiverEvent = new CustomEvent('candidate', {detail: candidate});
                 document.dispatchEvent(toReceiverEvent);
             };
 
-
-            let offer = await pc.createOffer();
+            const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            let message = pc.localDescription;
-            const toReceiverEvent = new CustomEvent('offer', {detail: message});
+            const toReceiverEvent = new CustomEvent('offer', {detail: offer});
             document.dispatchEvent(toReceiverEvent);
 
 
@@ -174,11 +158,10 @@
 
 
         // Segment
+        const ctx = selfieCanvas.getContext('2d');
 
-        let ctx = selfieCanvas.getContext('2d');
-
-        let offscreen = new OffscreenCanvas(1, 1);
-        let offscreenCtx = offscreen.getContext("2d");
+        const offscreen = new OffscreenCanvas(1, 1);
+        const offscreenCtx = offscreen.getContext('2d');
 
         const selfieSegmentation = new SelfieSegmentation({
             locateFile: (file) => {
@@ -190,18 +173,15 @@
         });
 
         async function segment(frame, controller) {
-
-            let height = frame.codedHeight;
-            let width = frame.codedWidth;
+            const height = frame.codedHeight;
+            const width = frame.codedWidth;
 
             offscreen.height = height;
             offscreen.width = width;
 
             offscreenCtx.drawImage(frame, 0, 0, width, height);
 
-
             await selfieSegmentation.onResults(results => {
-
                 ctx.save();
                 ctx.clearRect(0, 0, width, height);
                 ctx.drawImage(results.segmentationMask, 0, 0,
@@ -229,28 +209,20 @@
                 ctx.putImageData(transparentImageData, 0, 0);
 
                 ctx.restore();
-
-
             });
-
-
             await selfieSegmentation.send({image: offscreen});
-
         }
-
 
         // Get Video
         async function getVideo(height = 480, width = 640) {
-
             console.log(`Getting ${width}x${height} video`);
 
             selfieCanvas.height = height;
             selfieCanvas.width = width;
 
+            const videoSource = videoDevices[deviceSelect.selectedIndex || 0]?.deviceId;
 
-            let videoSource = videoDevices[deviceSelect.selectedIndex || 0]?.deviceId;
-
-            let stream = await navigator.mediaDevices.getUserMedia(
+            const stream = await navigator.mediaDevices.getUserMedia(
                 {
                     video:
                         {
@@ -259,7 +231,7 @@
                         }
                 });
 
-            console.log(`Capture camera with device ${videoDevices[deviceSelect.selectedIndex || 0]?.label}`);
+            console.log(`Capture camera with device ${stream.getTracks()[0].label}`);
             callBtn.disabled = false;
 
             const generator = new MediaStreamTrackGenerator({kind: 'video'});
@@ -274,17 +246,12 @@
                 await sendVideo(sendStream);
             };
 
-
             await processor.readable.pipeThrough(new TransformStream({
                 transform: (frame, controller) => segment(frame, controller)
             })).pipeTo(generator.writable);
-
         }
 
-
         async function start() {
-
-
             // allow camera selection
             let devices = await navigator.mediaDevices.enumerateDevices();
             videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -293,8 +260,6 @@
                 option.text = device.label;
                 deviceSelect.appendChild(option);
             });
-
-
             await getVideo();
 
             deviceSelect.onchange = getVideo;
@@ -302,12 +267,8 @@
             qvgaBtn.onclick = () => getVideo(240, 320);
             vgaBtn.onclick = () => getVideo(480, 640);
             hdBtn.onclick = () => getVideo(720, 1280);
-
         }
-
         start().catch(err => console.error(err));
-
-
     </script>
 </div>
 </body>
