@@ -25,9 +25,19 @@
             <label for="devices">Choose your camera</label>
             <select name="devices" id="devices"></select>
             <br>
+            <p>Pick a video resolution:</p>
             <button id="qvga">QVGA</button>
             <button id="vga">VGA</button>
             <button id="hd">HD</button>
+            <p>Adjust green screen parameters:</p>
+            <label for="g_floor">Minimum green value:</label>
+            <input type="range" min="0" max="255" value="105" id="g_floor" oninput="this.nextElementSibling.value = this.value">
+            <output>105</output>
+            <br>
+            <label for="rb_ceiling">Maximum red and blue values:</label>
+            <input type="range" min="0" max="255" value="80" id="rb_ceiling" oninput="this.nextElementSibling.value = this.value">
+            <output>80</output>
+
         </div>
         <div class="row">
             <div>

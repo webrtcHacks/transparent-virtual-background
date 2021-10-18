@@ -14,7 +14,14 @@ const qvgaBtn =  document.querySelector('button#qvga');
 const vgaBtn =  document.querySelector('button#vga');
 const hdBtn =  document.querySelector('button#hd');
 
+const gFloorRange= document.querySelector('input#g_floor');
+const rbCeilingRange= document.querySelector('input#rb_ceiling');
+
+
 const FRAME_RATE = 30;
+
+let videoWidth = 640;
+let videoHeight = 480;
 
 async function sendVideo(stream){
     callBtnGreen.disabled = true;
@@ -25,12 +32,6 @@ async function sendVideo(stream){
     pc.addTrack(track, stream);
     window.sendStream = stream;         // for debugging
 
-
-    // pc.onicecandidateerror = err => console.error(err);
-    // pc.onconnectionstatechange = e => console.debug(e);
-    // pc.oniceconnectionstatechange = e => console.debug(e);
-
-
     pc.onicecandidate = candidate => {
         const toReceiverEvent = new CustomEvent('candidate', {detail: candidate});
         document.dispatchEvent(toReceiverEvent);
@@ -39,7 +40,7 @@ async function sendVideo(stream){
     document.addEventListener('candidate', async e => {
         console.debug(e.detail);
         await pc.addIceCandidate(e.detail.candidate);
-    })
+    });
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -53,12 +54,12 @@ async function sendVideo(stream){
     });
 }
 
-async function getVideo(height=480, width=640){
-    console.log(`Getting ${width}x${height} video`);
+async function getVideo(){
+    console.log(`Getting ${videoWidth}x${videoHeight} video`);
 
     document.querySelectorAll('video').forEach(element=>{
-        element.height = height;
-        element.width = width;
+        element.height = videoHeight;
+        element.width = videoWidth;
     });
 
     let stream = videoElement.srcObject;
@@ -72,7 +73,7 @@ async function getVideo(height=480, width=640){
 
     stream = await navigator.mediaDevices.getUserMedia(
         {video:
-                { height: height, width: width, frameRate: FRAME_RATE,
+                { height: videoHeight, width: videoWidth, frameRate: FRAME_RATE,
                     deviceId: videoSource ? {exact: videoSource} : undefined}});
     videoElement.srcObject = stream;
 
@@ -83,12 +84,12 @@ async function start(){
     // create a stream and send it to replace when its starts playing
     videoElement.onplaying = async ()=> {
         await segment(videoElement, greenScreenCanvas);
-        addTransparency(greenScreenCanvas, transparentCanvas);
+        addTransparency(greenScreenCanvas, transparentCanvas, gFloorRange, rbCeilingRange);
     };
 
+    // Note: list of devices may change after first camera permission approval
     await getDevices();
     await getVideo();
-    // Note: list of devices may change after first approval.
 
     callBtnGreen.onclick = ()=> sendVideo(greenScreenCanvas.captureStream(FRAME_RATE));
     callBtnTransparent.onclick = ()=> sendVideo(transparentCanvas.captureStream(FRAME_RATE));
@@ -109,9 +110,23 @@ async function getDevices(){
 
 deviceSelect.onchange = getVideo;
 
-qvgaBtn.onclick = ()=>getVideo(240,320);
-vgaBtn.onclick = ()=>getVideo(480,640);
-hdBtn.onclick = ()=>getVideo(720,1280);
+qvgaBtn.onclick = async ()=>{
+    videoWidth = 320;
+    videoHeight = 240;
+    await getVideo();
+};
+
+vgaBtn.onclick = async ()=> {
+    videoWidth = 640;
+    videoHeight = 480;
+    await getVideo();
+};
+
+hdBtn.onclick = async ()=>{
+    videoWidth = 1280;
+    videoHeight = 720;
+    await getVideo();
+};
 
 
 start().catch(err=>console.error(err));

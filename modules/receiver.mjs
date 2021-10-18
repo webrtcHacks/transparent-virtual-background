@@ -3,11 +3,22 @@ import {addTransparency} from "./transparency.mjs";
 const videoElement = document.querySelector('video#receiver');
 const transparentCanvas = document.querySelector('canvas#transparent_receiver');
 
+const gFloorRange= document.querySelector('input#g_floor');
+const rbCeilingRange= document.querySelector('input#rb_ceiling');
+
 videoElement.onplaying = async ()=> {
-    addTransparency(videoElement, transparentCanvas);
+    addTransparency(videoElement, transparentCanvas, gFloorRange, rbCeilingRange);
 };
 
+// resize when the source changes
+videoElement.onresize = ()=>{
+    const ctx = transparentCanvas.getContext('2d');
+    ctx.clearRect(0,0, transparentCanvas.width, transparentCanvas.height);
+    transparentCanvas.width = videoElement.width;
+    transparentCanvas.height = videoElement.height;
+};
 
+// Look for an offer event to start the peerConnection and answer
 document.addEventListener('offer', async e => {
     console.debug(e.detail);
 
@@ -15,14 +26,10 @@ document.addEventListener('offer', async e => {
 
     pc.ontrack = e => {
         console.debug(e);
-        const stream = e.streams[0]; // || null;
+        const stream = e.streams[0];
         videoElement.srcObject = stream;
         window.receiveStream = stream;
     };
-
-    // pc.onicecandidateerror = err => console.error(err);
-    // pc.onconnectionstatechange = e => console.debug(e);
-    // pc.oniceconnectionstatechange = e => console.debug(e);
 
     pc.onicecandidate = candidate => {
         const toReceiverEvent = new CustomEvent('candidate', {detail: candidate});
