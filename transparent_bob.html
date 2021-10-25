@@ -5,6 +5,7 @@
     <title>Simplified Example</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"
             crossorigin="anonymous"></script>
+    <script src="https://mrdoob.github.io/stats.js/build/stats.min.js"></script>
     <style>
         body {
             background-color: cyan;
@@ -19,38 +20,61 @@
     <div>
         <h2>Sender</h2>
         <div>
-            <label for="devices">Choose your camera</label>
-            <select name="devices" id="devices"></select>
+            <label for="devices">Select your camera device: </label>
+            <select name="devices" id="devices" class="senderControls"></select>
             <br>
-            <button id="qvga">QVGA</button>
-            <button id="vga">VGA</button>
-            <button id="hd">HD</button>
+            <p>Select a resolution to begin camera capture:</p>
+            <button id="qvga" class="senderControls">QVGA</button>
+            <button id="vga" class="senderControls">VGA</button>
+            <button id="hd" class="senderControls">HD</button>
+            <button id="uhd" class="senderControls">UHD</button>
+
         </div>
     </div>
     <br>
     <div>
-        <h3>Source</h3>
         <canvas id="transparent_self" class="mirror"></canvas>
+        <div id="senderStats">
+            <!--div>
+                <p id="senderFps"></p>
+                <br>
+            </div-->
+        </div>
     </div>
     <br>
-    <button id="call" disabled>Send through peerConnection</button>
+    <button id="call" class="senderControls" disabled >Send through peerConnection</button>
     <br>
     <div>
         <h2>Receiver</h2>
         <video autoplay muted playsinline></video>
         <canvas id="transparent_receiver"></canvas>
+        <div id="receiverStats">
+            <!--div>
+                <p id="receiverFps"></p>
+                <br>
+            </div-->
+        </div>
+
     </div>
     <script type="module">
         const selfieCanvas = document.querySelector('canvas#transparent_self');
         // const receiverCanvas = document.querySelector('canvas#transparent_receiver');
-
 
         const deviceSelect = document.querySelector('select#devices');
 
         const qvgaBtn = document.querySelector('button#qvga');
         const vgaBtn = document.querySelector('button#vga');
         const hdBtn = document.querySelector('button#hd');
+        const uhdBtn = document.querySelector('button#uhd');
+
         const callBtn = document.querySelector('button#call');
+
+        // const senderFpsP = document.querySelector('p#senderFps');
+        // const receiverFpsP = document.querySelector('p#receiverFps');
+
+
+        let videoWidth = 640;
+        let videoHeight = 480;
 
         const FRAME_RATE = 30;
 
@@ -74,7 +98,17 @@
         // Receiver
         const receiverOffScreen = new OffscreenCanvas(1,1);
         const receiverCtx = receiverOffScreen.getContext("2d");
+
+        // stats setup
+        // let lastFrameTime = new Date();
+        const recStats = new Stats();
+        document.querySelector('div#receiverStats').appendChild(recStats.dom);
+        recStats.dom.style.position = 'relative';
+        recStats.dom.style.display = 'none';
+
         function addTransparency(frame, controller){
+            recStats.begin();
+
             const height = frame.codedHeight;
             const width = frame.codedWidth;
 
@@ -89,6 +123,13 @@
             const newFrame = new VideoFrame(receiverOffScreen);
             controller.enqueue(newFrame);
             frame.close();
+
+            // FPS calcs
+            // const now = new Date();
+            // const fps = (1000/(now-lastFrameTime)).toFixed();
+            // receiverFpsP.innerHTML = `FPS: ${fps}`;
+            // lastFrameTime = now;
+            recStats.end();
         }
 
         document.addEventListener('offer', async e => {
@@ -126,6 +167,9 @@
 
             const toSenderEvent = new CustomEvent('answer', {detail: answer});
             document.dispatchEvent(toSenderEvent);
+
+            recStats.dom.style.display = 'block';
+
         });
 
         // Sender
@@ -172,6 +216,12 @@
             modelSelection: 1,
         });
 
+
+        const senderStats = new Stats();
+        document.querySelector('div#senderStats').appendChild(senderStats.dom);
+        senderStats.dom.style.position = 'relative';
+        senderStats.dom.style.display = 'none';
+
         async function segment(frame, controller) {
             const height = frame.codedHeight;
             const width = frame.codedWidth;
@@ -180,6 +230,10 @@
             offscreen.width = width;
 
             offscreenCtx.drawImage(frame, 0, 0, width, height);
+
+            // stats setup
+            // let lastTime = new Date();
+            senderStats.begin();
 
             await selfieSegmentation.onResults(results => {
                 ctx.save();
@@ -209,12 +263,35 @@
                 ctx.putImageData(transparentImageData, 0, 0);
 
                 ctx.restore();
+
+                // FPS calcs
+                // const now = new Date();
+                // const fps = (1000/(now-lastTime)).toFixed();
+                // senderFpsP.innerHTML = `FPS: ${fps}`;
+                // lastTime = now;
+                senderStats.end();
+
             });
             await selfieSegmentation.send({image: offscreen});
         }
 
         // Get Video
-        async function getVideo(height = 480, width = 640) {
+        async function getVideo(width, height) {
+            // Use the last res when changing cameras
+            if(!width){
+                width = videoWidth;
+                height = videoHeight;
+            }
+            else{
+                videoHeight = height;
+                videoWidth = width;
+            }
+
+
+            // clean up resources if switching sources
+            if(window.stream)
+                window.stream.getTracks().forEach(track=>track.stop());
+
             console.log(`Getting ${width}x${height} video`);
 
             selfieCanvas.height = height;
@@ -231,6 +308,7 @@
                         }
                 });
 
+            window.stream = stream;
             console.log(`Capture camera with device ${stream.getTracks()[0].label}`);
             callBtn.disabled = false;
 
@@ -242,9 +320,13 @@
             let sendStream = new MediaStream([generator]);
 
             callBtn.onclick = async ()=> {
-                callBtn.disabled = true;
+                // Disable controls since the peerConnection won't update
+                // ToDo: replace track to allow cam switch when peerConnection is open
+                document.querySelectorAll('.senderControls').forEach(element=>element.disabled = true);
                 await sendVideo(sendStream);
             };
+
+            senderStats.dom.style.display = 'block';    // show stats
 
             await processor.readable.pipeThrough(new TransformStream({
                 transform: (frame, controller) => segment(frame, controller)
@@ -260,13 +342,13 @@
                 option.text = device.label;
                 deviceSelect.appendChild(option);
             });
-            await getVideo();
 
-            deviceSelect.onchange = getVideo;
+            deviceSelect.onchange = ()=>getVideo();
 
-            qvgaBtn.onclick = () => getVideo(240, 320);
-            vgaBtn.onclick = () => getVideo(480, 640);
-            hdBtn.onclick = () => getVideo(720, 1280);
+            qvgaBtn.onclick = () => getVideo(320, 240);
+            vgaBtn.onclick = () => getVideo(640, 480);
+            hdBtn.onclick = () => getVideo(1280, 720);
+            uhdBtn.onclick = () => getVideo(1920, 1080);
         }
         start().catch(err => console.error(err));
     </script>
