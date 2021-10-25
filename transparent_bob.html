@@ -33,12 +33,9 @@
     </div>
     <br>
     <div>
+        <!--video id="transparent_selfie" class="mirror"></video-->
         <canvas id="transparent_self" class="mirror"></canvas>
         <div id="senderStats">
-            <!--div>
-                <p id="senderFps"></p>
-                <br>
-            </div-->
         </div>
     </div>
     <br>
@@ -46,40 +43,12 @@
     <br>
     <div>
         <h2>Receiver</h2>
-        <video autoplay muted playsinline></video>
-        <canvas id="transparent_receiver"></canvas>
+        <video autoplay muted playsinline id="receiver"></video>
         <div id="receiverStats">
-            <!--div>
-                <p id="receiverFps"></p>
-                <br>
-            </div-->
         </div>
 
     </div>
-    <script type="module">
-        const selfieCanvas = document.querySelector('canvas#transparent_self');
-        // const receiverCanvas = document.querySelector('canvas#transparent_receiver');
-
-        const deviceSelect = document.querySelector('select#devices');
-
-        const qvgaBtn = document.querySelector('button#qvga');
-        const vgaBtn = document.querySelector('button#vga');
-        const hdBtn = document.querySelector('button#hd');
-        const uhdBtn = document.querySelector('button#uhd');
-
-        const callBtn = document.querySelector('button#call');
-
-        // const senderFpsP = document.querySelector('p#senderFps');
-        // const receiverFpsP = document.querySelector('p#receiverFps');
-
-
-        let videoWidth = 640;
-        let videoHeight = 480;
-
-        const FRAME_RATE = 30;
-
-        let videoDevices = [];
-
+    <script>
         // Transparency
         function addAplha(imageData) {
 
@@ -93,84 +62,27 @@
             }
             return imageData;
         }
+    </script>
+    <script type="module">
+        const selfieCanvas = document.querySelector('canvas#transparent_self');
+        const selfieVid = document.querySelector('video#transparent_selfie');
 
 
-        // Receiver
-        const receiverOffScreen = new OffscreenCanvas(1,1);
-        const receiverCtx = receiverOffScreen.getContext("2d");
+        const deviceSelect = document.querySelector('select#devices');
 
-        // stats setup
-        // let lastFrameTime = new Date();
-        const recStats = new Stats();
-        document.querySelector('div#receiverStats').appendChild(recStats.dom);
-        recStats.dom.style.position = 'relative';
-        recStats.dom.style.display = 'none';
+        const qvgaBtn = document.querySelector('button#qvga');
+        const vgaBtn = document.querySelector('button#vga');
+        const hdBtn = document.querySelector('button#hd');
+        const uhdBtn = document.querySelector('button#uhd');
 
-        function addTransparency(frame, controller){
-            recStats.begin();
+        const callBtn = document.querySelector('button#call');
 
-            const height = frame.codedHeight;
-            const width = frame.codedWidth;
+        let videoWidth = 640;
+        let videoHeight = 480;
 
-            receiverOffScreen.height = height;
-            receiverOffScreen.width = width;
+        const FRAME_RATE = 30;
 
-            receiverCtx.drawImage(frame, 0, 0, width, height);
-            let imageData = receiverCtx.getImageData(0, 0, width, height);
-            let transparentImageData = addAplha(imageData);
-            receiverCtx.putImageData(transparentImageData, 0, 0);
-
-            const newFrame = new VideoFrame(receiverOffScreen);
-            controller.enqueue(newFrame);
-            frame.close();
-
-            // FPS calcs
-            // const now = new Date();
-            // const fps = (1000/(now-lastFrameTime)).toFixed();
-            // receiverFpsP.innerHTML = `FPS: ${fps}`;
-            // lastFrameTime = now;
-            recStats.end();
-        }
-
-        document.addEventListener('offer', async e => {
-            console.debug(e.detail);
-
-            const pc = new RTCPeerConnection();
-
-            pc.ontrack = async e => {
-                console.debug(e);
-                const {track} = e;
-
-                const processor = new MediaStreamTrackProcessor({track});
-
-                const generator = new MediaStreamTrackGenerator({kind: 'video'});
-                const transparentStream = new MediaStream([generator]);
-                document.querySelector('video').srcObject = transparentStream;
-
-                await processor.readable.pipeThrough(new TransformStream({
-                    transform: (frame, controller) => addTransparency(frame, controller)
-                })).pipeTo(generator.writable);
-
-            };
-
-            document.addEventListener('candidate', async e => {
-                console.debug(e.detail);
-                await pc.addIceCandidate(e.detail.candidate);
-            });
-
-            await pc.setRemoteDescription(e.detail);
-
-            window.receiverPc = pc;
-
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-
-            const toSenderEvent = new CustomEvent('answer', {detail: answer});
-            document.dispatchEvent(toSenderEvent);
-
-            recStats.dom.style.display = 'block';
-
-        });
+        let videoDevices = [];
 
         // Sender
         async function sendVideo(stream) {
@@ -264,11 +176,6 @@
 
                 ctx.restore();
 
-                // FPS calcs
-                // const now = new Date();
-                // const fps = (1000/(now-lastTime)).toFixed();
-                // senderFpsP.innerHTML = `FPS: ${fps}`;
-                // lastTime = now;
                 senderStats.end();
 
             });
@@ -312,12 +219,14 @@
             console.log(`Capture camera with device ${stream.getTracks()[0].label}`);
             callBtn.disabled = false;
 
-            const generator = new MediaStreamTrackGenerator({kind: 'video'});
+            const generatorSelfie = new MediaStreamTrackGenerator({kind: 'video'});
+            const generatorSender = new MediaStreamTrackGenerator({kind: 'video'});
 
             let [track] = stream.getVideoTracks();
 
             const processor = new MediaStreamTrackProcessor({track});
-            let sendStream = new MediaStream([generator]);
+            const selfieStream = new MediaStream([generatorSelfie]);
+            const sendStream = new MediaStream([generatorSender]);
 
             callBtn.onclick = async ()=> {
                 // Disable controls since the peerConnection won't update
@@ -327,10 +236,11 @@
             };
 
             senderStats.dom.style.display = 'block';    // show stats
+            selfieVid.srcObject = selfieStream;
 
             await processor.readable.pipeThrough(new TransformStream({
                 transform: (frame, controller) => segment(frame, controller)
-            })).pipeTo(generator.writable);
+            })).pipeTo(generatorSender.writable);
         }
 
         async function start() {
@@ -351,6 +261,82 @@
             uhdBtn.onclick = () => getVideo(1920, 1080);
         }
         start().catch(err => console.error(err));
+    </script>
+
+    <!-- Receiver -->
+    <script type="module">
+
+        // Receiver
+        const receiverOffScreen = new OffscreenCanvas(1,1);
+        const receiverCtx = receiverOffScreen.getContext("2d");
+
+        // stats setup
+        // let lastFrameTime = new Date();
+        const recStats = new Stats();
+        document.querySelector('div#receiverStats').appendChild(recStats.dom);
+        recStats.dom.style.position = 'relative';
+        recStats.dom.style.display = 'none';
+
+        function addTransparency(frame, controller){
+            recStats.begin();
+
+            const height = frame.codedHeight;
+            const width = frame.codedWidth;
+
+            receiverOffScreen.height = height;
+            receiverOffScreen.width = width;
+
+            receiverCtx.drawImage(frame, 0, 0, width, height);
+            let imageData = receiverCtx.getImageData(0, 0, width, height);
+            let transparentImageData = addAplha(imageData);
+            receiverCtx.putImageData(transparentImageData, 0, 0);
+
+            const newFrame = new VideoFrame(receiverOffScreen);
+            controller.enqueue(newFrame);
+            frame.close();
+
+            recStats.end();
+        }
+
+        document.addEventListener('offer', async e => {
+            console.debug(e.detail);
+
+            const pc = new RTCPeerConnection();
+
+            pc.ontrack = async e => {
+                console.debug(e);
+                const {track} = e;
+
+                const processor = new MediaStreamTrackProcessor({track});
+
+                const generator = new MediaStreamTrackGenerator({kind: 'video'});
+                const transparentStream = new MediaStream([generator]);
+                document.querySelector('video#receiver').srcObject = transparentStream;
+
+                await processor.readable.pipeThrough(new TransformStream({
+                    transform: (frame, controller) => addTransparency(frame, controller)
+                })).pipeTo(generator.writable);
+
+            };
+
+            document.addEventListener('candidate', async e => {
+                console.debug(e.detail);
+                await pc.addIceCandidate(e.detail.candidate);
+            });
+
+            await pc.setRemoteDescription(e.detail);
+
+            window.receiverPc = pc;
+
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+
+            const toSenderEvent = new CustomEvent('answer', {detail: answer});
+            document.dispatchEvent(toSenderEvent);
+
+            recStats.dom.style.display = 'block';
+
+        });
     </script>
 </div>
 </body>
