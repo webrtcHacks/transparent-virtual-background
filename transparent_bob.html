@@ -33,8 +33,8 @@
     </div>
     <br>
     <div>
-        <!--video id="transparent_selfie" class="mirror"></video-->
-        <canvas id="transparent_self" class="mirror"></canvas>
+        <video id="transparent_selfie" class="mirror" autoplay muted playsinline></video>
+        <!--canvas id="transparent_self" class="mirror"></canvas-->
         <div id="senderStats">
         </div>
     </div>
@@ -43,7 +43,7 @@
     <br>
     <div>
         <h2>Receiver</h2>
-        <video autoplay muted playsinline id="receiver"></video>
+        <video id="receiver" autoplay muted playsinline></video>
         <div id="receiverStats">
         </div>
 
@@ -64,7 +64,15 @@
         }
     </script>
     <script type="module">
-        const selfieCanvas = document.querySelector('canvas#transparent_self');
+        if (typeof MediaStreamTrackProcessor === 'undefined' ||
+            typeof MediaStreamTrackGenerator === 'undefined') {
+            alert(
+                'Your browser does not support the experimental MediaStreamTrack API ' +
+                'for Insertable Streams of Media.)')
+        }
+
+
+        // const selfieCanvas = document.querySelector('canvas#transparent_self');
         const selfieVid = document.querySelector('video#transparent_selfie');
 
 
@@ -92,7 +100,6 @@
 
             const pc = new RTCPeerConnection();
             pc.addTrack(track, stream);
-            window.sendStream = stream;         // for debugging
 
             pc.onicecandidate = candidate => {
                 const toReceiverEvent = new CustomEvent('candidate', {detail: candidate});
@@ -114,10 +121,10 @@
 
 
         // Segment
-        const ctx = selfieCanvas.getContext('2d');
+        //const ctx = selfieCanvas.getContext('2d');
 
-        const offscreen = new OffscreenCanvas(1, 1);
-        const offscreenCtx = offscreen.getContext('2d');
+        const segmentCanvas = new OffscreenCanvas(1, 1);
+        const segmentCtx = segmentCanvas.getContext('2d');
 
         const selfieSegmentation = new SelfieSegmentation({
             locateFile: (file) => {
@@ -129,6 +136,7 @@
         });
 
 
+        // Sender stats setup
         const senderStats = new Stats();
         document.querySelector('div#senderStats').appendChild(senderStats.dom);
         senderStats.dom.style.position = 'relative';
@@ -138,36 +146,37 @@
             const height = frame.codedHeight;
             const width = frame.codedWidth;
 
-            offscreen.height = height;
-            offscreen.width = width;
+            segmentCanvas.height = height;
+            segmentCanvas.width = width;
 
-            offscreenCtx.drawImage(frame, 0, 0, width, height);
+            segmentCtx.drawImage(frame, 0, 0, width, height);
 
             // stats setup
-            // let lastTime = new Date();
             senderStats.begin();
 
-            await selfieSegmentation.onResults(results => {
-                ctx.save();
-                ctx.clearRect(0, 0, width, height);
-                ctx.drawImage(results.segmentationMask, 0, 0,
+            await selfieSegmentation.onResults(async results => {
+                segmentCtx.save();
+                segmentCtx.clearRect(0, 0, width, height);
+                segmentCtx.drawImage(results.segmentationMask, 0, 0,
                     width, height);
 
                 // Only overwrite existing pixels with green.
-                ctx.globalCompositeOperation = 'source-out'; // 'source-in';
-                ctx.fillStyle = '#00FF00';
-                ctx.fillRect(0, 0, width, height);
+                segmentCtx.globalCompositeOperation = 'source-out'; // 'source-in';
+                segmentCtx.fillStyle = '#00FF00';
+                segmentCtx.fillRect(0, 0, width, height);
 
                 // Only overwrite missing pixels.
-                ctx.globalCompositeOperation = 'destination-atop';
-                ctx.drawImage(
+                segmentCtx.globalCompositeOperation = 'destination-atop';
+                segmentCtx.drawImage(
                     results.image, 0, 0, width, height);
-                ctx.restore();
+                segmentCtx.restore();
 
-                const newFrame = new VideoFrame(selfieCanvas);
+                const newFrame = new VideoFrame(segmentCanvas);
                 controller.enqueue(newFrame);
                 frame.close();
 
+                /*
+                // Use this if you have a selfie <canvas> instead of <video>
                 ctx.save();
                 // Add the transparency for selfie display
                 let imageData = ctx.getImageData(0, 0, width, height);
@@ -176,14 +185,51 @@
 
                 ctx.restore();
 
+                 */
+
                 senderStats.end();
 
             });
-            await selfieSegmentation.send({image: offscreen});
+            await selfieSegmentation.send({image: segmentCanvas});
+        }
+
+        // const transparentCanvas = new OffscreenCanvas(1, 1);
+        // const transparentCtx = transparentCanvas.getContext('2d');
+
+        async function transparent(frame, controller){
+            segmentCtx.save();
+            // Add the transparency for selfie display
+            const imageData = segmentCtx.getImageData(0, 0, frame.codedWidth, frame.codedHeight);
+            const transparentImageData = addAplha(imageData);
+            segmentCtx.putImageData(transparentImageData, 0, 0);
+            segmentCtx.restore();
+
+            const newFrame = new VideoFrame(segmentCanvas);
+            controller.enqueue(newFrame);
+            frame.close();
+        }
+
+        function showTransparentSelfie(segmentedStream){
+            let [track] = segmentedStream.getVideoTracks();
+            const transparentProcessor = new MediaStreamTrackProcessor({track});
+            const generatorSelfie = new MediaStreamTrackGenerator({kind: 'video'});
+            const selfieStream = new MediaStream([generatorSelfie]);
+            selfieVid.srcObject = selfieStream;
+
+            transparentProcessor.readable
+                .pipeThrough(new TransformStream({
+                    transform: (frame, controller) => transparent(frame, controller)
+                }))
+                .pipeTo(generatorSelfie.writable)
+                .catch(err=>console.error("show selfie transparency error", err))
         }
 
         // Get Video
         async function getVideo(width, height) {
+            // clean up resources if switching sources
+            if(window.stream)
+                window.stream.getTracks().forEach(track=>track.stop());
+
             // Use the last res when changing cameras
             if(!width){
                 width = videoWidth;
@@ -194,15 +240,9 @@
                 videoWidth = width;
             }
 
-
-            // clean up resources if switching sources
-            if(window.stream)
-                window.stream.getTracks().forEach(track=>track.stop());
-
-            console.log(`Getting ${width}x${height} video`);
-
-            selfieCanvas.height = height;
-            selfieCanvas.width = width;
+            // console.log(`Getting ${width}x${height} video`);
+            // selfieCanvas.height = height;
+            // selfieCanvas.width = width;
 
             const videoSource = videoDevices[deviceSelect.selectedIndex || 0]?.deviceId;
 
@@ -216,17 +256,15 @@
                 });
 
             window.stream = stream;
-            console.log(`Capture camera with device ${stream.getTracks()[0].label}`);
+            const settings = stream.getVideoTracks()[0].getSettings();
+            console.log(`Capture camera with device ${stream.getVideoTracks()[0].label} at ${settings.width}x${settings.height}`);
             callBtn.disabled = false;
 
-            const generatorSelfie = new MediaStreamTrackGenerator({kind: 'video'});
             const generatorSender = new MediaStreamTrackGenerator({kind: 'video'});
-
             let [track] = stream.getVideoTracks();
-
             const processor = new MediaStreamTrackProcessor({track});
-            const selfieStream = new MediaStream([generatorSelfie]);
             const sendStream = new MediaStream([generatorSender]);
+            window.sendStream = sendStream;         // for debugging
 
             callBtn.onclick = async ()=> {
                 // Disable controls since the peerConnection won't update
@@ -236,11 +274,19 @@
             };
 
             senderStats.dom.style.display = 'block';    // show stats
-            selfieVid.srcObject = selfieStream;
 
-            await processor.readable.pipeThrough(new TransformStream({
+            // Note: doesn't work (change to let sendStream
+            // sendStream.onaddtrack = (track)=> showTransparentSelfie(track);
+            // sendStream.onactive = (track)=> showTransparentSelfie(track);
+
+            showTransparentSelfie(sendStream);
+
+            processor.readable.pipeThrough(new TransformStream({
                 transform: (frame, controller) => segment(frame, controller)
-            })).pipeTo(generatorSender.writable);
+            }))
+                .pipeTo(generatorSender.writable)
+                .catch(err=>console.error("greenscreen generator error", err))
+
         }
 
         async function start() {
