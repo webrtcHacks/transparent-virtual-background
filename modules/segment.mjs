@@ -19,30 +19,23 @@ function greenScreen(results) {
     ctx.restore();
 }
 
-export async function segment(inputVideo, outputCanvas){
-    height = inputVideo.videoHeight;
-    width = inputVideo.videoWidth;
+const selfieSegmentation = new SelfieSegmentation({locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
+    }});
+selfieSegmentation.setOptions({
+    modelSelection: 1,
+});
+
+export async function segment(videoElement, outputCanvas){
+
+    width = videoElement.width;
+    height = videoElement.height;
 
     outputCanvas.height = height;
     outputCanvas.width = width;
 
     ctx = outputCanvas.getContext('2d');
 
-    const selfieSegmentation = new SelfieSegmentation({locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
-        }});
-    selfieSegmentation.setOptions({
-        modelSelection: 1,
-    });
-
-    await selfieSegmentation.onResults(greenScreen);
-
-    async function draw(){
-        await selfieSegmentation.send({image: inputVideo});
-        inputVideo.requestVideoFrameCallback(draw);
-    }
-
-    // ToDo: this method doesn't work in FF or Safari
-    inputVideo.requestVideoFrameCallback(draw);
+    selfieSegmentation.onResults(greenScreen);
+    await selfieSegmentation.send({image: videoElement});
 }
-

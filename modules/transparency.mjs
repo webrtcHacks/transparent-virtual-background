@@ -1,4 +1,3 @@
-
 function addAplha(imageData, gFloor=105, rbCeiling=80) {
     const {data} = imageData;
 
@@ -9,12 +8,15 @@ function addAplha(imageData, gFloor=105, rbCeiling=80) {
     return imageData
 }
 
+export let transparencyFps;
+
 export function addTransparency(source, outputCanvas, gFloorElem, rbCeilingElem) {
     const outputCtx = outputCanvas.getContext('2d');
 
     outputCanvas.height = source.height;
     outputCanvas.width = source.width;
 
+    let lastTime = new Date();
     const getImageData = () => {
         const width = source.width;
         const height = source.height;
@@ -24,8 +26,13 @@ export function addTransparency(source, outputCanvas, gFloorElem, rbCeilingElem)
         const transparentImageData = addAplha(imageData, gFloorElem.value, rbCeilingElem.value );
         outputCtx.putImageData(transparentImageData, 0, 0);
 
+        let now = new Date();
+        transparencyFps = 1000/(now-lastTime);
+        lastTime = now;
+
         requestAnimationFrame(getImageData);
     };
 
     getImageData();
 }
+

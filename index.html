@@ -2,16 +2,24 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Transparent WebRTC Background Playground</title>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"
             crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://mrdoob.github.io/stats.js/build/stats.min.js"></script>
     <style>
         body {
             background-color: cyan;
         }
+
+        p {
+            margin: 2px;
+        }
+
         .row {
             display: flex;
         }
+
         .mirror {
             transform: scaleX(-1);
         }
@@ -19,61 +27,145 @@
 </head>
 <body>
 <div class="container">
-    <div>
-        <h2>Sender</h2>
+
+    <h2>Green Screen Transparency Controls</h2>
+    <div class="row">
         <div>
-            <label for="devices">Choose your camera</label>
-            <select name="devices" id="devices"></select>
-            <br>
-            <p>Pick a video resolution:</p>
-            <button id="qvga">QVGA</button>
-            <button id="vga">VGA</button>
-            <button id="hd">HD</button>
-            <p>Adjust green screen parameters:</p>
+            <h4>Canvas method</h4>
             <label for="g_floor">Minimum green value:</label>
-            <input type="range" min="0" max="255" value="105" id="g_floor" oninput="this.nextElementSibling.value = this.value">
+            <input type="range" min="0" max="255" value="105" id="g_floor"
+                   oninput="this.nextElementSibling.value = this.value"/>
             <output>105</output>
             <br>
             <label for="rb_ceiling">Maximum red and blue values:</label>
-            <input type="range" min="0" max="255" value="80" id="rb_ceiling" oninput="this.nextElementSibling.value = this.value">
+            <input type="range" min="0" max="255" value="80" id="rb_ceiling"
+                   oninput="this.nextElementSibling.value = this.value"/>
             <output>80</output>
-
         </div>
-        <div class="row">
-            <div>
-                <h3>Source video</h3>
-                <video id="gum_video" autoplay muted playsinline class="mirror"></video>
-            </div>
-            <div>
-                <h3>Segmented with green background</h3>
-                <canvas id="green_screen_canvas" class="mirror"></canvas>
-            </div>
-            <div>
-                <h3>Transparency added</h3>
-                <canvas id="transparent_canvas" class="mirror"></canvas>
-            </div>
+        <div>
+            <h4>webGL method</h4>
+            <p>
+                <label for="keyColor">keyColor</label>
+                <input type="color" id="keyColor" value="#00ff00" class="senderControl"/>
+            </p>
+            <p>
+                <label for="similarity">Similarity</label>
+                <input type="range" id="similarity" min="0" max="1" step="0.001" value="0.4"
+                       oninput="this.nextElementSibling.value = this.value"/>
+                <output>0.4</output>
+
+            </p>
+            <p>
+                <label for="smoothness">Smoothness</label>
+                <input type="range" id="smoothness" min="0" max="1" step="0.001" value="0.08"
+                       oninput="this.nextElementSibling.value = this.value"/>
+                <output>0.08</output>
+
+            </p>
+            <p>
+                <label for="spill">Spill</label>
+                <input type="range" id="spill" min="0" max="1" step="0.001" value="0.1"
+                       oninput="this.nextElementSibling.value = this.value"/>
+                <output>0.1</output>
+            </p>
+
         </div>
     </div>
 
+    <h2>Sender</h2>
     <div>
-        <h2>Receiver</h2>
-        <button id="call_green" class="callBtn">call using green screen</button>
-        <button id="call_transparent" class="callBtn">call using transparent background</button>
-        <div class="row">
-            <div>
-                <h3>Received video</h3>
-                <video id="receiver" autoplay muted playsinline></video>
-            </div>
 
-            <div>
-                <h3>Transparency added</h3>
-                <canvas id="transparent_receiver"></canvas>
-            </div>
+        <h3>Webcam options</h3>
+        <div>
+            <label for="devices">Choose your camera source</label>
+            <select name="devices" id="devices" class="senderControl"></select>
+            <br>
+            <p>Pick a video resolution (default VGA)</p>
+            <button id="qvga" class="senderControl">QVGA</button>
+            <button id="vga" class="senderControl">VGA</button>
+            <button id="hd" class="senderControl">HD</button>
+        </div>
+
+        <h3>Choose the elements you want to enable</h3>
+        <div>
+            <input type="checkbox" id="show_video" checked/>
+            <label for="show_video">Webcam video</label>
+
+            <input type="checkbox" id="show_greenscreen" class="senderControl" checked/>
+            <label for="show_greenscreen">Viewable Green Screen</label>
+
+            <input type="checkbox" id="show_transparency" checked/>
+            <label for="show_transparency">Show Transparency</label>
+
+            <input type="checkbox" id="show_webgl_transparency" checked/>
+            <label for="show_webgl_transparency">Show WebGL Transparency</label>
+        </div>
+
+        <h3>Adjust green screen parameters</h3>
+    </div>
+    <div class="row">
+        <div>
+            <h3>Webcam video</h3>
+            <video id="gum_video" autoplay muted playsinline class="mirror"></video>
+        </div>
+        <br>
+        <div>
+            <h3>Segmented with green background</h3>
+            <canvas id="green_screen_canvas" class="mirror"></canvas>
+        </div>
+        <div>
+            <h3>Canvas Transparency added</h3>
+            <canvas id="transparent_canvas" class="mirror"></canvas>
+        </div>
+        <div>
+            <h3>webGL Transparency added</h3>
+            <canvas id="webgl_canvas" class="mirror"></canvas>
         </div>
     </div>
+
+    <h3>Place a WebRTC Call</h3>
+    <div>
+        <button id="call_green" class="callBtn senderControl">using green screen</button>
+        <button id="call_transparent_canvas" class="callBtn senderControl">using canvas transparency</button>
+        <button id="call_transparent_webgl" class="callBtn senderControl">using webgl transparency</button>
+    </div>
+
+
+</div>
+
+<div>
+    <h2>Receiver</h2>
+    <h3>Choose the elements you want to see</h3>
+    <div>
+        <input type="checkbox" id="recevier_show_video" checked/>
+        <label for="recevier_show_video">Incoming stream</label>
+        <input type="checkbox" id="receiver_show_transparency" checked/>
+        <label for="receiver_show_transparency">Add Transparency</label>
+        <input type="checkbox" id="receiver_show_webgl_transparency" checked/>
+        <label for="receiver_show_webgl_transparency">Add WebGL Transparency</label>
+    </div>
+
+    <div class="row">
+        <div>
+            <h3>Received video</h3>
+            <video id="receiver" autoplay muted playsinline></video>
+        </div>
+
+        <div>
+            <h3>Canvas Transparency added</h3>
+            <canvas id="transparent_receiver"></canvas>
+        </div>
+
+        <div>
+            <h3>WebGL Transparency added</h3>
+            <canvas id="transparent_receiver_webgl"></canvas>
+        </div>
+    </div>
+</div>
 
 
 </div>
 <script type="module" src="main.js"></script>
 </body>
 </html>
+

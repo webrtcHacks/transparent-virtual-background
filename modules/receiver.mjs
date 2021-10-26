@@ -1,13 +1,28 @@
 import {addTransparency} from "./transparency.mjs";
+import {addShader} from "./wegbl-transparency.mjs";
 
 const videoElement = document.querySelector('video#receiver');
 const transparentCanvas = document.querySelector('canvas#transparent_receiver');
+const transparentCanvasWebgl = document.querySelector('canvas#transparent_receiver_webgl');
+
 
 const gFloorRange= document.querySelector('input#g_floor');
 const rbCeilingRange= document.querySelector('input#rb_ceiling');
 
+const keyColor = document.getElementById("keyColor");
+const similarityRange = document.getElementById("similarity");
+const smoothnessRange = document.getElementById("smoothness");
+const spillRange = document.getElementById("spill");
+
+const incomingVideoEnabled = document.querySelector('input#recevier_show_video');
+const transparencyEnabled = document.querySelector('input#receiver_show_transparency');
+const transparencyWebGlEnabled = document.querySelector('input#receiver_show_webgl_transparency');
+
+
 videoElement.onplaying = async ()=> {
     addTransparency(videoElement, transparentCanvas, gFloorRange, rbCeilingRange);
+    addShader(videoElement, transparentCanvasWebgl, keyColor, similarityRange, smoothnessRange, spillRange);
+
 };
 
 // resize when the source changes
@@ -52,3 +67,22 @@ document.addEventListener('offer', async e => {
     const toSenderEvent = new CustomEvent('answer', {detail: answer});
     document.dispatchEvent(toSenderEvent);
 });
+
+
+incomingVideoEnabled.onclick =()=> {
+    console.log("Receiver: Changing incoming video display state");
+    videoElement.parentElement.hidden = !videoElement.parentElement.hidden;
+    videoElement.play();
+
+};
+
+transparencyEnabled.onclick =()=> {
+    console.log("Receiver: Changing transparency display state");
+    transparentCanvas.parentElement.hidden = !transparentCanvas.parentElement.hidden;
+};
+
+
+transparencyWebGlEnabled.onclick =()=> {
+    console.log("Receiver: Changing WebGL transparency display state");
+    transparentCanvasWebgl.parentElement.hidden = !transparentCanvasWebgl.parentElement.hidden;
+};
