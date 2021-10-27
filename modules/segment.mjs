@@ -1,22 +1,31 @@
-let ctx, height, width;
+// ToDo: make this a class
+let height, width;
 
-function greenScreen(results) {
-    ctx.save();
+function transparent(results, ctx) {
     ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(results.segmentationMask, 0, 0,
-        width, height);
 
-    // Only overwrite existing pixels.
-    ctx.globalCompositeOperation = 'source-out'; // 'source-in';
+    // Draw the mask
+    ctx.drawImage(results.segmentationMask, 0, 0, width, height);
+
+    // Add the original video back in only overwriting the masked pixels
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.drawImage(results.image, 0, 0, width, height);
+}
+
+function greenScreen(results, ctx) {
+    ctx.clearRect(0, 0, width, height);
+
+    // Draw the mask
+    ctx.drawImage(results.segmentationMask, 0, 0, width, height);
+
+    // Fill green on everything but the mask
+    ctx.globalCompositeOperation = 'source-out';
     ctx.fillStyle = '#00FF00';
     ctx.fillRect(0, 0, width, height);
 
-    // Only overwrite missing pixels.
-    ctx.globalCompositeOperation = 'destination-atop';
-    ctx.drawImage(
-        results.image, 0, 0, width, height);
-
-    ctx.restore();
+    // Add the original video back in (in image) , but only overwrite missing pixels.
+    ctx.globalCompositeOperation =  'destination-atop';
+    ctx.drawImage(results.image, 0, 0, width, height);
 }
 
 const selfieSegmentation = new SelfieSegmentation({locateFile: (file) => {
@@ -26,16 +35,22 @@ selfieSegmentation.setOptions({
     modelSelection: 1,
 });
 
-export async function segment(videoElement, outputCanvas){
+export async function segment(videoElement, transparentCanvas, greenCanvas){
 
     width = videoElement.width;
     height = videoElement.height;
 
-    outputCanvas.height = height;
-    outputCanvas.width = width;
+    transparentCanvas.height = height;
+    transparentCanvas.width = width;
+    const transparentCtx = transparentCanvas.getContext('2d');
 
-    ctx = outputCanvas.getContext('2d');
+    greenCanvas.height = height;
+    greenCanvas.width = width;
+    const greenCtx = greenCanvas.getContext('2d');
 
-    selfieSegmentation.onResults(greenScreen);
+    selfieSegmentation.onResults(results=>{
+        transparent(results, transparentCtx);
+        greenScreen(results, greenCtx);
+    });
     await selfieSegmentation.send({image: videoElement});
 }

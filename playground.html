@@ -46,7 +46,7 @@
             <h4>webGL method</h4>
             <p>
                 <label for="keyColor">keyColor</label>
-                <input type="color" id="keyColor" value="#00ff00" class="senderControl"/>
+                <input type="color" id="keyColor" value="#00ff00"/>
             </p>
             <p>
                 <label for="similarity">Similarity</label>
@@ -91,11 +91,14 @@
             <input type="checkbox" id="show_video" checked/>
             <label for="show_video">Webcam video</label>
 
-            <input type="checkbox" id="show_greenscreen" class="senderControl" checked/>
-            <label for="show_greenscreen">Viewable Green Screen</label>
-
             <input type="checkbox" id="show_transparency" checked/>
             <label for="show_transparency">Show Transparency</label>
+
+            <input type="checkbox" id="show_green_screen" checked/>
+            <label for="show_green_screen">Show Green Screen</label>
+
+            <input type="checkbox" id="show_green_transparency" checked/>
+            <label for="show_green_transparency">Show Green Transparency</label>
 
             <input type="checkbox" id="show_webgl_transparency" checked/>
             <label for="show_webgl_transparency">Show WebGL Transparency</label>
@@ -110,26 +113,31 @@
         </div>
         <br>
         <div>
-            <h3>Segmented with green background</h3>
-            <canvas id="green_screen_canvas" class="mirror"></canvas>
-        </div>
-        <div>
-            <h3>Canvas Transparency added</h3>
+            <h3>Transparent background</h3>
             <canvas id="transparent_canvas" class="mirror"></canvas>
         </div>
         <div>
-            <h3>webGL Transparency added</h3>
-            <canvas id="webgl_canvas" class="mirror"></canvas>
+            <h3>Green background</h3>
+            <canvas id="green_screen_canvas" class="mirror"></canvas>
+        </div>
+        <div>
+            <h3>Canvas Green Transparency</h3>
+            <canvas id="transparent_green_canvas" class="mirror"></canvas>
+        </div>
+        <div>
+            <h3>webGL Green Transparency</h3>
+            <canvas id="transparent_green_webgl" class="mirror"></canvas>
         </div>
     </div>
 
     <h3>Place a WebRTC Call</h3>
     <div>
-        <button id="call_green" class="callBtn senderControl">using green screen</button>
-        <button id="call_transparent_canvas" class="callBtn senderControl">using canvas transparency</button>
-        <button id="call_transparent_webgl" class="callBtn senderControl">using webgl transparency</button>
+        <p>Choose the source to use:</p>
+        <button id="call_transparent" class="callBtn senderControl">transparency</button>
+        <button id="call_green" class="callBtn senderControl">green screen</button>
+        <button id="call_transparent_green" class="callBtn senderControl">green transparency</button>
+        <button id="call_transparent_webgl" class="callBtn senderControl">webgl transparency</button>
     </div>
-
 
 </div>
 
@@ -137,8 +145,8 @@
     <h2>Receiver</h2>
     <h3>Choose the elements you want to see</h3>
     <div>
-        <input type="checkbox" id="recevier_show_video" checked/>
-        <label for="recevier_show_video">Incoming stream</label>
+        <input type="checkbox" id="receiver_show_video" checked/>
+        <label for="receiver_show_video">Incoming stream</label>
         <input type="checkbox" id="receiver_show_transparency" checked/>
         <label for="receiver_show_transparency">Add Transparency</label>
         <input type="checkbox" id="receiver_show_webgl_transparency" checked/>

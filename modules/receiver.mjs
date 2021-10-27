@@ -14,7 +14,7 @@ const similarityRange = document.getElementById("similarity");
 const smoothnessRange = document.getElementById("smoothness");
 const spillRange = document.getElementById("spill");
 
-const incomingVideoEnabled = document.querySelector('input#recevier_show_video');
+const incomingVideoEnabled = document.querySelector('input#receiver_show_video');
 const transparencyEnabled = document.querySelector('input#receiver_show_transparency');
 const transparencyWebGlEnabled = document.querySelector('input#receiver_show_webgl_transparency');
 

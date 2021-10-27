@@ -1,4 +1,4 @@
-// Copy Right from James Fisher
+// Copyright from James Fisher
 // Source: https://jameshfisher.com/2020/08/11/production-ready-green-screen-in-the-browser/
 // Republished with permission of the author
 

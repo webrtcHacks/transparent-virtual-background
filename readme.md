@@ -6,7 +6,9 @@ The transparency function then sets the alpha channel on green to 100 so it is t
 
 WebRTC does not support the alpha channel, so you need to send a green background and apply the transparency after that.
 
-### index.html
+### playground.html
+
+Try it: [playground.html](playground.html)
 
 Step by step so you can see the process. Uses the modules folder.
 
@@ -14,7 +16,10 @@ There is also a _stats_ branch where I attempted to use https://github.com/mrdoo
 That's a work in progress I didn't finish.
 
 
-### transparent_bob.html
+### transparency.html
+
+Try it: [transparency.html](transparency.html)
+
 
 All-in one file that uses WebRTC Insertable Streams ([media capture transform](https://github.com/w3c/mediacapture-transform) / 
 break out box / why so many names???). 
@@ -27,7 +32,6 @@ Added camera device selection to quickly see how different camera angles perform
 * As shown in index.html, the above still works on the receiver end if you set your green tolerance large enough
 * sending the wegGL source over a peerConnection doesn't work at all
 * When I tried the same with breakout box it set the background to black
-
 
 
 ## ToDo
