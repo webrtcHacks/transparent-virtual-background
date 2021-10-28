@@ -34,7 +34,6 @@
     <br>
     <div>
         <video id="transparent_selfie" class="mirror" autoplay muted playsinline></video>
-        <!--canvas id="transparent_self" class="mirror"></canvas-->
         <div id="senderStats">
         </div>
     </div>
@@ -48,21 +47,6 @@
         </div>
 
     </div>
-    <script>
-        // Transparency
-        function addAplha(imageData) {
-
-            let data = imageData.data;
-            const gFloor = 105;         // consider any green above this value to be transparent
-            const rbCeiling = 80;       // highest value for red and blue to be considered transparent
-
-            for (let r = 0, g = 1, b = 2, a = 3; a < data.length; r += 4, g += 4, b += 4, a += 4) {
-                if (data[r] <= rbCeiling && data[b] <= rbCeiling && data[g] >= gFloor)
-                    data[a] = 0;
-            }
-            return imageData;
-        }
-    </script>
     <script type="module">
         if (typeof MediaStreamTrackProcessor === 'undefined' ||
             typeof MediaStreamTrackGenerator === 'undefined') {
@@ -72,9 +56,7 @@
         }
 
 
-        // const selfieCanvas = document.querySelector('canvas#transparent_self');
         const selfieVid = document.querySelector('video#transparent_selfie');
-
 
         const deviceSelect = document.querySelector('select#devices');
 
@@ -92,12 +74,56 @@
 
         let videoDevices = [];
 
+
+        function addGreenScreen(stream){
+
+            const greenCanvas = new OffscreenCanvas(1, 1);
+            const greenCtx = greenCanvas.getContext('2d');
+
+
+            function addGreen(frame, controller){
+                const height = frame.codedHeight;
+                const width = frame.codedWidth;
+
+                greenCanvas.height = height;
+                greenCanvas.width = width;
+
+                greenCtx.clearRect(0, 0, width, height);
+                greenCtx.drawImage(frame, 0, 0, width, height);
+
+                // Only overwrite non-existing pixels with green.
+                greenCtx.globalCompositeOperation = 'destination-over';
+                greenCtx.fillStyle = '#00FF00';
+                greenCtx.fillRect(0, 0, width, height);
+
+                const senderFrame = new VideoFrame(greenCanvas);
+                controller.enqueue(senderFrame);
+                frame.close();
+
+            }
+
+            // Add green screen
+            const track = stream.getVideoTracks()[0];
+            const greenProcessor = new MediaStreamTrackProcessor({track});
+            const greenGenerator = new MediaStreamTrackGenerator({kind: 'video'});
+            const greenStream = new MediaStream([greenGenerator]);
+
+            greenProcessor.readable
+                .pipeThrough(new TransformStream({
+                    transform: (frame, controller) => addGreen(frame, controller)
+                }))
+                .pipeTo(greenGenerator.writable)
+                .catch(err=>console.error("add green screen error", err));
+
+            return greenStream;
+        }
+
+
         // Sender
         async function sendVideo(stream) {
             console.log("peerConnection starting");
 
-            const track = stream.getVideoTracks()[0];
-
+            const [track] = stream.getVideoTracks();
             const pc = new RTCPeerConnection();
             pc.addTrack(track, stream);
 
@@ -142,6 +168,7 @@
         senderStats.dom.style.position = 'relative';
         senderStats.dom.style.display = 'none';
 
+
         async function segment(frame, controller) {
             const height = frame.codedHeight;
             const width = frame.codedWidth;
@@ -151,41 +178,25 @@
 
             segmentCtx.drawImage(frame, 0, 0, width, height);
 
+
             // stats setup
             senderStats.begin();
 
             await selfieSegmentation.onResults(async results => {
-                segmentCtx.save();
+
                 segmentCtx.clearRect(0, 0, width, height);
-                segmentCtx.drawImage(results.segmentationMask, 0, 0,
-                    width, height);
+                segmentCtx.drawImage(results.segmentationMask, 0, 0, width, height);
 
-                // Only overwrite existing pixels with green.
-                segmentCtx.globalCompositeOperation = 'source-out'; // 'source-in';
-                segmentCtx.fillStyle = '#00FF00';
-                segmentCtx.fillRect(0, 0, width, height);
+                // Grab the transparent image
+                // segmentCtx.save();
+                // Add the original video back in only overwriting the masked pixels
+                segmentCtx.globalCompositeOperation = 'source-in';
+                segmentCtx.drawImage(results.image, 0, 0, width, height);
 
-                // Only overwrite missing pixels.
-                segmentCtx.globalCompositeOperation = 'destination-atop';
-                segmentCtx.drawImage(
-                    results.image, 0, 0, width, height);
-                segmentCtx.restore();
-
-                const newFrame = new VideoFrame(segmentCanvas);
-                controller.enqueue(newFrame);
+                // ToDo: need to get a different controller
+                const selfieFrame = new VideoFrame(segmentCanvas);
+                controller.enqueue(selfieFrame);
                 frame.close();
-
-                /*
-                // Use this if you have a selfie <canvas> instead of <video>
-                ctx.save();
-                // Add the transparency for selfie display
-                let imageData = ctx.getImageData(0, 0, width, height);
-                let transparentImageData = addAplha(imageData);
-                ctx.putImageData(transparentImageData, 0, 0);
-
-                ctx.restore();
-
-                 */
 
                 senderStats.end();
 
@@ -193,39 +204,9 @@
             await selfieSegmentation.send({image: segmentCanvas});
         }
 
-        // const transparentCanvas = new OffscreenCanvas(1, 1);
-        // const transparentCtx = transparentCanvas.getContext('2d');
-
-        async function transparent(frame, controller){
-            segmentCtx.save();
-            // Add the transparency for selfie display
-            const imageData = segmentCtx.getImageData(0, 0, frame.codedWidth, frame.codedHeight);
-            const transparentImageData = addAplha(imageData);
-            segmentCtx.putImageData(transparentImageData, 0, 0);
-            segmentCtx.restore();
-
-            const newFrame = new VideoFrame(segmentCanvas);
-            controller.enqueue(newFrame);
-            frame.close();
-        }
-
-        function showTransparentSelfie(segmentedStream){
-            let [track] = segmentedStream.getVideoTracks();
-            const transparentProcessor = new MediaStreamTrackProcessor({track});
-            const generatorSelfie = new MediaStreamTrackGenerator({kind: 'video'});
-            const selfieStream = new MediaStream([generatorSelfie]);
-            selfieVid.srcObject = selfieStream;
-
-            transparentProcessor.readable
-                .pipeThrough(new TransformStream({
-                    transform: (frame, controller) => transparent(frame, controller)
-                }))
-                .pipeTo(generatorSelfie.writable)
-                .catch(err=>console.error("show selfie transparency error", err))
-        }
-
         // Get Video
         async function getVideo(width, height) {
+
             // clean up resources if switching sources
             if(window.stream)
                 window.stream.getTracks().forEach(track=>track.stop());
@@ -239,10 +220,6 @@
                 videoHeight = height;
                 videoWidth = width;
             }
-
-            // console.log(`Getting ${width}x${height} video`);
-            // selfieCanvas.height = height;
-            // selfieCanvas.width = width;
 
             const videoSource = videoDevices[deviceSelect.selectedIndex || 0]?.deviceId;
 
@@ -258,34 +235,37 @@
             window.stream = stream;
             const settings = stream.getVideoTracks()[0].getSettings();
             console.log(`Capture camera with device ${stream.getVideoTracks()[0].label} at ${settings.width}x${settings.height}`);
+
             callBtn.disabled = false;
-
-            const generatorSender = new MediaStreamTrackGenerator({kind: 'video'});
-            let [track] = stream.getVideoTracks();
-            const processor = new MediaStreamTrackProcessor({track});
-            const sendStream = new MediaStream([generatorSender]);
-            window.sendStream = sendStream;         // for debugging
-
-            callBtn.onclick = async ()=> {
-                // Disable controls since the peerConnection won't update
-                // ToDo: replace track to allow cam switch when peerConnection is open
-                document.querySelectorAll('.senderControls').forEach(element=>element.disabled = true);
-                await sendVideo(sendStream);
-            };
-
             senderStats.dom.style.display = 'block';    // show stats
+
+            let [track] = stream.getVideoTracks();
+            const segmentGenerator = new MediaStreamTrackGenerator({kind: 'video'});
+            const processor = new MediaStreamTrackProcessor({track});
+            const segmentStream = new MediaStream([segmentGenerator]);
+
+
+            // ToDo: tee - https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/tee
+            processor.readable.pipeThrough(new TransformStream({
+                transform: (frame, controller) => segment(frame, controller)
+            }))
+                .pipeTo(segmentGenerator.writable)
+                .catch(err=>console.error("greenscreen generator error", err));
+
 
             // Note: doesn't work (change to let sendStream
             // sendStream.onaddtrack = (track)=> showTransparentSelfie(track);
             // sendStream.onactive = (track)=> showTransparentSelfie(track);
 
-            showTransparentSelfie(sendStream);
+            selfieVid.srcObject = segmentStream;
 
-            processor.readable.pipeThrough(new TransformStream({
-                transform: (frame, controller) => segment(frame, controller)
-            }))
-                .pipeTo(generatorSender.writable)
-                .catch(err=>console.error("greenscreen generator error", err))
+            callBtn.onclick = async ()=> {
+                // Disable controls since the peerConnection won't update
+                // ToDo: replace track to allow cam switch when peerConnection is open
+                document.querySelectorAll('.senderControls').forEach(element=>element.disabled = true);
+                const greenStream = addGreenScreen(segmentStream);
+                await sendVideo(greenStream);
+            };
 
         }
 
@@ -312,6 +292,20 @@
     <!-- Receiver -->
     <script type="module">
 
+        // Transparency
+        function addAlpha(imageData) {
+
+            let data = imageData.data;
+            const gFloor = 105;         // consider any green above this value to be transparent
+            const rbCeiling = 80;       // highest value for red and blue to be considered transparent
+
+            for (let r = 0, g = 1, b = 2, a = 3; a < data.length; r += 4, g += 4, b += 4, a += 4) {
+                if (data[r] <= rbCeiling && data[b] <= rbCeiling && data[g] >= gFloor)
+                    data[a] = 0;
+            }
+            return imageData;
+        }
+
         // Receiver
         const receiverOffScreen = new OffscreenCanvas(1,1);
         const receiverCtx = receiverOffScreen.getContext("2d");
@@ -334,7 +328,7 @@
 
             receiverCtx.drawImage(frame, 0, 0, width, height);
             let imageData = receiverCtx.getImageData(0, 0, width, height);
-            let transparentImageData = addAplha(imageData);
+            let transparentImageData = addAlpha(imageData);
             receiverCtx.putImageData(transparentImageData, 0, 0);
 
             const newFrame = new VideoFrame(receiverOffScreen);
