@@ -46,7 +46,11 @@ const FRAME_RATE = 30;
 let videoWidth = 640;
 let videoHeight = 480;
 
-const offscreenCanvas = new OffscreenCanvas(1, 1);
+
+
+// Safari & Firefox don't support OffscreenCanvas
+const offscreenCanvas = typeof OffscreenCanvas === 'undefined' ? document.createElement("canvas") :
+    new OffscreenCanvas(1, 1);
 let segmentedCanvas;
 
 async function sendVideo(stream) {

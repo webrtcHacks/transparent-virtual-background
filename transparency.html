@@ -10,6 +10,7 @@
         body {
             background-color: cyan;
         }
+
         .mirror {
             transform: scaleX(-1);
         }
@@ -20,15 +21,20 @@
     <div>
         <h2>Sender</h2>
         <div>
-            <label for="devices">Select your camera device: </label>
-            <select name="devices" id="devices" class="senderControls"></select>
-            <br>
-            <p>Select a resolution to begin camera capture:</p>
-            <button id="qvga" class="senderControls">QVGA</button>
-            <button id="vga" class="senderControls">VGA</button>
-            <button id="hd" class="senderControls">HD</button>
-            <button id="uhd" class="senderControls">UHD</button>
-
+            <p>
+                <label for="enabled">Enable segmentation and transparency: </label>
+                <input name="enabled" id="enabled" class="senderControls" type="checkbox" checked/>
+            </p>
+            <p>
+                <label for="devices">Select your camera device: </label>
+                <select name="devices" id="devices" class="senderControls"></select>
+            </p>
+            <p>Select a resolution to begin camera capture:
+                <button id="qvga" class="senderControls">QVGA</button>
+                <button id="vga" class="senderControls">VGA</button>
+                <button id="hd" class="senderControls">HD</button>
+                <button id="uhd" class="senderControls">UHD</button>
+            </p>
         </div>
     </div>
     <br>
@@ -38,7 +44,7 @@
         </div>
     </div>
     <br>
-    <button id="call" class="senderControls" disabled >Send through peerConnection</button>
+    <button id="call" class="senderControls" disabled>Send through peerConnection</button>
     <br>
     <div>
         <h2>Receiver</h2>
@@ -67,6 +73,8 @@
 
         const callBtn = document.querySelector('button#call');
 
+        const enabled = document.querySelector('input#enabled');
+
         let videoWidth = 640;
         let videoHeight = 480;
 
@@ -75,13 +83,15 @@
         let videoDevices = [];
 
 
-        function addGreenScreen(stream){
+        function addGreenScreen(stream) {
 
-            const greenCanvas = new OffscreenCanvas(1, 1);
+            // Safari & Firefox don't support OffscreenCanvas
+            const greenCanvas = typeof OffscreenCanvas === 'undefined' ? document.createElement("canvas") :
+                new OffscreenCanvas(1, 1);
             const greenCtx = greenCanvas.getContext('2d');
 
 
-            function addGreen(frame, controller){
+            function addGreen(frame, controller) {
                 const height = frame.codedHeight;
                 const width = frame.codedWidth;
 
@@ -113,7 +123,7 @@
                     transform: (frame, controller) => addGreen(frame, controller)
                 }))
                 .pipeTo(greenGenerator.writable)
-                .catch(err=>console.error("add green screen error", err));
+                .catch(err => console.error("add green screen error", err));
 
             return greenStream;
         }
@@ -208,15 +218,14 @@
         async function getVideo(width, height) {
 
             // clean up resources if switching sources
-            if(window.stream)
-                window.stream.getTracks().forEach(track=>track.stop());
+            if (window.stream)
+                window.stream.getTracks().forEach(track => track.stop());
 
             // Use the last res when changing cameras
-            if(!width){
+            if (!width) {
                 width = videoWidth;
                 height = videoHeight;
-            }
-            else{
+            } else {
                 videoHeight = height;
                 videoWidth = width;
             }
@@ -236,35 +245,51 @@
             const settings = stream.getVideoTracks()[0].getSettings();
             console.log(`Capture camera with device ${stream.getVideoTracks()[0].label} at ${settings.width}x${settings.height}`);
 
-            callBtn.disabled = false;
-            senderStats.dom.style.display = 'block';    // show stats
+            let segmentStream;
 
-            let [track] = stream.getVideoTracks();
-            const segmentGenerator = new MediaStreamTrackGenerator({kind: 'video'});
-            const processor = new MediaStreamTrackProcessor({track});
-            const segmentStream = new MediaStream([segmentGenerator]);
+            // Option to run without segmentation/transparency for benchmarking
+            if (enabled.checked) {
+                callBtn.disabled = false;
+                senderStats.dom.style.display = 'block';    // show stats
 
+                let [track] = stream.getVideoTracks();
+                const segmentGenerator = new MediaStreamTrackGenerator({kind: 'video'});
+                const processor = new MediaStreamTrackProcessor({track});
+                segmentStream = new MediaStream([segmentGenerator]);
 
-            // ToDo: tee - https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/tee
-            processor.readable.pipeThrough(new TransformStream({
-                transform: (frame, controller) => segment(frame, controller)
-            }))
-                .pipeTo(segmentGenerator.writable)
-                .catch(err=>console.error("greenscreen generator error", err));
+                selfieVid.srcObject = segmentStream;
+
+                processor.readable.pipeThrough(new TransformStream({
+                    transform: (frame, controller) => segment(frame, controller)
+                }))
+                    .pipeTo(segmentGenerator.writable)
+                    .catch(err => console.error("green screen generator error", err));
+            } else {
+                segmentStream = stream;
+                selfieVid.srcObject = stream;
+                callBtn.disabled = false;
+
+            }
 
 
             // Note: doesn't work (change to let sendStream
             // sendStream.onaddtrack = (track)=> showTransparentSelfie(track);
             // sendStream.onactive = (track)=> showTransparentSelfie(track);
 
-            selfieVid.srcObject = segmentStream;
 
-            callBtn.onclick = async ()=> {
-                // Disable controls since the peerConnection won't update
+            callBtn.onclick = async () => {
                 // ToDo: replace track to allow cam switch when peerConnection is open
-                document.querySelectorAll('.senderControls').forEach(element=>element.disabled = true);
-                const greenStream = addGreenScreen(segmentStream);
-                await sendVideo(greenStream);
+
+                // Disable controls since the peerConnection won't update
+                document.querySelectorAll('.senderControls').forEach(element => element.disabled = true);
+
+                if (enabled.checked) {
+                    const greenStream = addGreenScreen(segmentStream);
+                    await sendVideo(greenStream);
+                } else {
+                    await sendVideo(stream);
+                }
+
             };
 
         }
@@ -279,13 +304,14 @@
                 deviceSelect.appendChild(option);
             });
 
-            deviceSelect.onchange = ()=>getVideo();
+            deviceSelect.onchange = () => getVideo();
 
             qvgaBtn.onclick = () => getVideo(320, 240);
             vgaBtn.onclick = () => getVideo(640, 480);
             hdBtn.onclick = () => getVideo(1280, 720);
             uhdBtn.onclick = () => getVideo(1920, 1080);
         }
+
         start().catch(err => console.error(err));
     </script>
 
@@ -307,7 +333,8 @@
         }
 
         // Receiver
-        const receiverOffScreen = new OffscreenCanvas(1,1);
+        const receiverOffScreen = typeof OffscreenCanvas === 'undefined' ? document.createElement("canvas") :
+            new OffscreenCanvas(1, 1);
         const receiverCtx = receiverOffScreen.getContext("2d");
 
         // stats setup
@@ -317,7 +344,7 @@
         recStats.dom.style.position = 'relative';
         recStats.dom.style.display = 'none';
 
-        function addTransparency(frame, controller){
+        function addTransparency(frame, controller) {
             recStats.begin();
 
             const height = frame.codedHeight;
