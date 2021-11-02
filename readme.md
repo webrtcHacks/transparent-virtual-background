@@ -23,8 +23,11 @@ Step by step with many options so you can see the process. Uses the modules fold
 
 Try it: [transparency.html](transparency.html)
 
-
 All-in one file that uses WebRTC Insertable Streams ([media capture transform](https://github.com/w3c/mediacapture-transform) / 
 break out box). Meant to mimic a WebRTC app where you would send your video with a green screen to
 another user and view someone else's incoming video with a transparent background.
+
+
+## Demo video
+[![webrtcHacks Transparent Background Playground demo](https://webrtchacks.com/wp-content/uploads/2021/11/webrtcHacks-Transparency-Playground-demo-small.gif)](https://webrtchacks.com/wp-content/uploads/2021/11/webrtcHacks-Transparency-Playground-demo.mp4)
 
