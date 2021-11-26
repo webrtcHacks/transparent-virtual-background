@@ -14,14 +14,14 @@ post on webrtcHacks.com for full details and experimental results.
 
 ### playground.html
 
-Try it: [playground.html](playground.html)
+Try it: [playground.html](https://webrtchacks.github.io/transparent-virtual-background/playground.html)
 
 Step by step with many options so you can see the process. Uses the modules folder.
 
 
 ### transparency.html
 
-Try it: [transparency.html](transparency.html)
+Try it: [transparency.html](https://webrtchacks.github.io/transparent-virtual-background/transparency.html)
 
 All-in one file that uses WebRTC Insertable Streams ([media capture transform](https://github.com/w3c/mediacapture-transform) / 
 break out box). Meant to mimic a WebRTC app where you would send your video with a green screen to
